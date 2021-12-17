@@ -12,6 +12,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/dnsutil"
 	"github.com/coredns/coredns/plugin/pkg/fall"
+	"github.com/coredns/coredns/plugin/pkg/upstream"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
 	core "k8s.io/api/core/v1"
@@ -22,8 +23,9 @@ import (
 
 // KubeNodes implements a plugin that connects to a KubeNodes cluster.
 type KubeNodes struct {
-	Next  plugin.Handler
-	Zones []string
+	Next     plugin.Handler
+	Zones    []string
+	Upstream upstreamer
 
 	APIServer       string
 	APICertAuth     string
@@ -45,10 +47,15 @@ type KubeNodes struct {
 	stopCh   chan struct{}
 }
 
+type upstreamer interface {
+	Lookup(ctx context.Context, state request.Request, name string, typ uint16) (*dns.Msg, error)
+}
+
 // New returns a initialized KubeNodes.
 func New(zones []string) *KubeNodes {
 	k := new(KubeNodes)
 	k.Zones = zones
+	k.Upstream = upstream.New()
 	k.ttl = defaultTTL
 	k.stopCh = make(chan struct{})
 	k.ipType = core.NodeInternalIP
@@ -135,15 +142,27 @@ func (k KubeNodes) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 		return dns.RcodeServerFailure, fmt.Errorf("unexpected %q from *Node index", reflect.TypeOf(item))
 	}
 
-	// extract ips/hosts from the node
-	var ips []string   // results in A/AAAA records
-	var hosts []string // results in CNAME records
+	// extract IPs from the node
+	var ips []string
 	for _, addr := range node.Status.Addresses {
 		switch addr.Type {
 		case k.ipType:
 			ips = append(ips, addr.Address)
 		case k.dnsType:
-			hosts = append(hosts, addr.Address)
+			// DNS type node addresses cant be represented as CNAMEs, since a CNAME record must be the only record with
+			// it's name. So look up the IP address and append them to ips
+			m, err := k.Upstream.Lookup(ctx, state, addr.Address, state.QType())
+			if err != nil {
+				return dns.RcodeServerFailure, err
+			}
+			for _, a := range m.Answer {
+				switch a.Header().Rrtype {
+				case dns.TypeA:
+					ips = append(ips, a.(*dns.A).A.String())
+				case dns.TypeAAAA:
+					ips = append(ips, a.(*dns.AAAA).AAAA.String())
+				}
+			}
 		}
 	}
 
@@ -159,7 +178,6 @@ func (k KubeNodes) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 					Hdr: dns.RR_Header{Name: qname, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: k.ttl}})
 			}
 		}
-		// todo: handle hosts as CNAME responses
 	}
 	if state.QType() == dns.TypeAAAA {
 		for _, ip := range ips {
@@ -171,7 +189,6 @@ func (k KubeNodes) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 					Hdr: dns.RR_Header{Name: qname, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: k.ttl}})
 			}
 		}
-		// todo: handle hosts as CNAME responses
 	}
 
 	writeResponse(w, r, records, nil, nil, dns.RcodeSuccess)

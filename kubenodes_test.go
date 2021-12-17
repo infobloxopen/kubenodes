@@ -2,11 +2,13 @@ package kubenodes
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/test"
+	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -177,6 +179,70 @@ func TestServeDNSExternal(t *testing.T) {
 	runTests(t, ctx, k, externalCases)
 }
 
+func TestServeDNSUpstream(t *testing.T) {
+	k := New([]string{"example.", "in-addr.arpa.", "ip6.arpa."})
+	k.Upstream = newTestUpstream("testup", net.ParseIP("4.3.2.1"))
+
+	var externalCases = []test.Case{
+		{
+			Qname: "node1.example.", Qtype: dns.TypeA,
+			Rcode: dns.RcodeSuccess,
+			Answer: []dns.RR{
+				test.A("node1.example.	5	IN	A	1.2.3.4"),
+				test.A("node1.example.	5	IN	A	4.3.2.1"),
+			},
+		},
+		{
+			Qname: "node2.example.", Qtype: dns.TypeA,
+			Rcode: dns.RcodeSuccess,
+			Answer: []dns.RR{
+				test.A("node2.example.	5	IN	A	1.2.3.4"),
+			},
+		},
+	}
+
+	k.client = fake.NewSimpleClientset()
+	ctx := context.Background()
+	node1 := &core.Node{
+		ObjectMeta: meta.ObjectMeta{
+			Name: "node1",
+		},
+		Status: core.NodeStatus{
+			Addresses: []core.NodeAddress{
+				{Type: core.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: core.NodeInternalDNS, Address: "testup"},
+			},
+		},
+	}
+	node2 := &core.Node{
+		ObjectMeta: meta.ObjectMeta{
+			Name: "node2",
+		},
+		Status: core.NodeStatus{
+			Addresses: []core.NodeAddress{
+				{Type: core.NodeInternalIP, Address: "1.2.3.4"},
+				{Type: core.NodeInternalDNS, Address: "unresolvable"},
+			},
+		},
+	}
+	k.client.CoreV1().Nodes().Create(ctx, node1, meta.CreateOptions{})
+	k.client.CoreV1().Nodes().Create(ctx, node2, meta.CreateOptions{})
+
+	start, stop, err := k.InitAPIConn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	start()
+
+	// quick and dirty wait for sync
+	for !k.controller.HasSynced() {
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	runTests(t, ctx, k, externalCases)
+}
+
 func runTests(t *testing.T, ctx context.Context, k *KubeNodes, cases []test.Case) {
 	for i, tc := range cases {
 		r := tc.Msg()
@@ -196,4 +262,25 @@ func runTests(t *testing.T, ctx context.Context, k *KubeNodes, cases []test.Case
 		}
 	}
 
+}
+
+type testUpstream struct {
+	qname string
+	resp  *dns.Msg
+}
+
+func newTestUpstream(qname string, ip net.IP) *testUpstream {
+	return &testUpstream{qname, &dns.Msg{
+		MsgHdr: dns.MsgHdr{Response: true},
+		Answer: []dns.RR{&dns.A{Hdr: dns.RR_Header{Name: qname, Rrtype: dns.TypeA, Class: dns.ClassINET}, A: ip}},
+	}}
+}
+
+func (tu *testUpstream) Lookup(ctx context.Context, r request.Request, name string, typ uint16) (*dns.Msg, error) {
+	if tu.qname != name {
+		return &dns.Msg{
+			MsgHdr: dns.MsgHdr{Response: true, Rcode: dns.RcodeNameError},
+		}, nil
+	}
+	return tu.resp, nil
 }
