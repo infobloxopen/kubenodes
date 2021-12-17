@@ -45,7 +45,7 @@ kubenodes [ZONES...] {
 
 ## External Plugin
 
-To use this plugin, compile CoreDNS with this plugin added to the `plugin.cfg`.  It will need to be positioned before
+To use this plugin, compile CoreDNS with this plugin added to the `plugin.cfg`.  It should be positioned before
 the _kubernetes_ plugin if _kubenode_ is using the same zone or a superzone of _kubernetes_.
 
 ## Ready
@@ -67,7 +67,7 @@ Use Nodes' external addresses to answer forward and reverse lookups in the zone 
 to the next plugin for reverse lookups that don't match any Nodes' external IP addresses.
 
 ```
-kubenodes node.example in-addr.arpa ip6.arpa {
+kubenodes example in-addr.arpa ip6.arpa {
   external
   fallthrough in-addr.arpa ip6.arpa
 }
