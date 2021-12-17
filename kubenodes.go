@@ -25,13 +25,14 @@ type KubeNodes struct {
 	Next  plugin.Handler
 	Zones []string
 
-	APIServer     string
-	APICertAuth   string
-	APIClientCert string
-	APIClientKey  string
-	ClientConfig  clientcmd.ClientConfig
-	Fall          fall.F
-	ttl           uint32
+	APIServer       string
+	APICertAuth     string
+	APIClientCert   string
+	APIClientKey    string
+	ClientConfig    clientcmd.ClientConfig
+	Fall            fall.F
+	ttl             uint32
+	ipType, dnsType core.NodeAddressType
 
 	// Kubernetes API interface
 	client     kubernetes.Interface
@@ -50,6 +51,8 @@ func New(zones []string) *KubeNodes {
 	k.Zones = zones
 	k.ttl = defaultTTL
 	k.stopCh = make(chan struct{})
+	k.ipType = core.NodeInternalIP
+	k.dnsType = core.NodeInternalDNS
 	return k
 }
 
@@ -132,14 +135,16 @@ func (k KubeNodes) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 		return dns.RcodeServerFailure, fmt.Errorf("unexpected %q from *Node index", reflect.TypeOf(item))
 	}
 
-	// extract IPs from the node
-	var ips []string
+	// extract ips/hosts from the node
+	var ips []string   // results in A/AAAA records
+	var hosts []string // results in CNAME records
 	for _, addr := range node.Status.Addresses {
-		if addr.Type != core.NodeInternalIP {
-			// for now, just look at internal IPs
-			continue
+		switch addr.Type {
+		case k.ipType:
+			ips = append(ips, addr.Address)
+		case k.dnsType:
+			hosts = append(hosts, addr.Address)
 		}
-		ips = append(ips, addr.Address)
 	}
 
 	// build response records
@@ -154,6 +159,7 @@ func (k KubeNodes) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 					Hdr: dns.RR_Header{Name: qname, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: k.ttl}})
 			}
 		}
+		// todo: handle hosts as CNAME responses
 	}
 	if state.QType() == dns.TypeAAAA {
 		for _, ip := range ips {
@@ -165,6 +171,7 @@ func (k KubeNodes) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Ms
 					Hdr: dns.RR_Header{Name: qname, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: k.ttl}})
 			}
 		}
+		// todo: handle hosts as CNAME responses
 	}
 
 	writeResponse(w, r, records, nil, nil, dns.RcodeSuccess)

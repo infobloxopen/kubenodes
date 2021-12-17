@@ -6,7 +6,7 @@
 
 ## Description
 
-*kubenodes* watches the Kubernetes API and synthesizes A, AAAA, and PTR records for InternalIPs of Nodes.
+*kubenodes* watches the Kubernetes API and synthesizes A, AAAA, and PTR records for Node addresses.
 
 This plugin can only be used once per Server Block.
 
@@ -14,6 +14,7 @@ This plugin can only be used once per Server Block.
 
 ```
 kubenodes [ZONES...] {
+    external
     endpoint URL
     tls CERT KEY CACERT
     kubeconfig KUBECONFIG [CONTEXT]
@@ -21,7 +22,8 @@ kubenodes [ZONES...] {
     fallthrough [ZONES...]
 }
 ```
-
+* `external` will build records using Nodes' external addresses.  If omitted, *kubenodes* will build records using
+  Nodes' internal addresses.
 * `endpoint` specifies the **URL** for a remote k8s API endpoint.
   If omitted, it will connect to k8s in-cluster using the cluster service account.
 * `tls` **CERT** **KEY** **CACERT** are the TLS cert, key and the CA cert file names for remote k8s connection.
@@ -51,11 +53,21 @@ This plugin reports that it is ready to the _ready_ plugin once it has synced to
 
 ## Examples
 
-Answer forward and reverse lookups for nodes under the zone `node.cluster.local.`. Fallthrough to next plugin for
-reverse lookups that don't match any Nodes' InternalIPs.
+Use Nodes' internal addresses to answer forward and reverse lookups in the zone `node.cluster.local.`.
+Fallthrough to the next plugin for reverse lookups that don't match any Nodes' internal IP addresses.
 
 ```
 kubenodes node.cluster.local in-addr.arpa ip6.arpa {
+  fallthrough in-addr.arpa ip6.arpa
+}
+```
+
+Use Nodes' external addresses to answer forward and reverse lookups in the zone `example.`. Fallthrough
+to the next plugin for reverse lookups that don't match any Nodes' external IP addresses.
+
+```
+kubenodes node.example in-addr.arpa ip6.arpa {
+  external
   fallthrough in-addr.arpa ip6.arpa
 }
 ```

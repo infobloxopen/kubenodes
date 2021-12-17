@@ -79,12 +79,15 @@ func parseStanza(c *caddy.Controller) (*KubeNodes, error) {
 
 	for c.NextBlock() {
 		switch c.Val() {
+		case "external":
+			kns.ipType = core.NodeExternalIP
+			kns.dnsType = core.NodeExternalDNS
 		case "endpoint":
 			args := c.RemainingArgs()
-				if len(args) != 1 {
-					return nil, c.ArgErr()
-				}
-				kns.APIServer = args[0]
+			if len(args) != 1 {
+				return nil, c.ArgErr()
+			}
+			kns.APIServer = args[0]
 		case "tls": // cert key ca
 			args := c.RemainingArgs()
 			if len(args) == 3 {
@@ -200,14 +203,14 @@ func (k *KubeNodes) InitAPIConn(ctx context.Context) (onStart func() error, onSh
 		&core.Node{},
 		0,
 		cache.ResourceEventHandlerFuncs{},
-		cache.Indexers{"reverse": func (obj interface{}) ([]string, error) {
+		cache.Indexers{"reverse": func(obj interface{}) ([]string, error) {
 			node, ok := obj.(*core.Node)
 			if !ok {
 				return nil, errors.New("unexpected obj type")
 			}
 			var idx []string
 			for _, addr := range node.Status.Addresses {
-				if addr.Type != core.NodeInternalIP {
+				if addr.Type != k.ipType {
 					continue
 				}
 				idx = append(idx, addr.Address)
@@ -234,4 +237,3 @@ func (k *KubeNodes) InitAPIConn(ctx context.Context) (onStart func() error, onSh
 
 	return onStart, onShut, err
 }
-
