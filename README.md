@@ -7,6 +7,7 @@
 ## Description
 
 *kubenodes* watches the Kubernetes API and synthesizes A, AAAA, and PTR records for Node addresses.
+This plugin requires list/watch permission to the Nodes API.
 
 This plugin can only be used once per Server Block.
 
