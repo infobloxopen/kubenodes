@@ -1,10 +1,11 @@
-module github.com/chrisohaver/kubenodes
+module github.com/infobloxopen/kubenodes
 
 go 1.17
 
 require (
 	github.com/coredns/caddy v1.1.1
 	github.com/coredns/coredns v1.8.6
+	github.com/coredns/kubeapi v0.0.0-20220113203125-d145486b90fd
 	github.com/miekg/dns v1.1.43
 	k8s.io/api v0.23.0
 	k8s.io/apimachinery v0.23.0

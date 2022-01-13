@@ -9,16 +9,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coredns/coredns/plugin"
-	"github.com/coredns/coredns/plugin/pkg/dnsutil"
-	"github.com/coredns/coredns/plugin/pkg/fall"
-	"github.com/coredns/coredns/plugin/pkg/upstream"
-	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/pkg/dnsutil"
+	"github.com/coredns/coredns/plugin/pkg/fall"
+	"github.com/coredns/coredns/plugin/pkg/upstream"
+	"github.com/coredns/coredns/request"
 )
 
 // KubeNodes implements a plugin that connects to a KubeNodes cluster.

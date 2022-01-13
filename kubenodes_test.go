@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coredns/coredns/plugin/pkg/dnstest"
-	"github.com/coredns/coredns/plugin/test"
-	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/coredns/coredns/plugin/pkg/dnstest"
+	"github.com/coredns/coredns/plugin/test"
+	"github.com/coredns/coredns/request"
 )
 
 func TestServeDNSInternal(t *testing.T) {
@@ -80,12 +81,9 @@ func TestServeDNSInternal(t *testing.T) {
 	k.client.CoreV1().Nodes().Create(ctx, node1, meta.CreateOptions{})
 	k.client.CoreV1().Nodes().Create(ctx, node2, meta.CreateOptions{})
 
-	start, stop, err := k.InitAPIConn(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stop()
-	start()
+	k.setWatch(ctx)
+	go k.controller.Run(k.stopCh)
+	defer close(k.stopCh)
 
 	// quick and dirty wait for sync
 	for !k.controller.HasSynced() {
@@ -164,12 +162,9 @@ func TestServeDNSExternal(t *testing.T) {
 	k.client.CoreV1().Nodes().Create(ctx, node1, meta.CreateOptions{})
 	k.client.CoreV1().Nodes().Create(ctx, node2, meta.CreateOptions{})
 
-	start, stop, err := k.InitAPIConn(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stop()
-	start()
+	k.setWatch(ctx)
+	go k.controller.Run(k.stopCh)
+	defer close(k.stopCh)
 
 	// quick and dirty wait for sync
 	for !k.controller.HasSynced() {
@@ -228,12 +223,9 @@ func TestServeDNSUpstream(t *testing.T) {
 	k.client.CoreV1().Nodes().Create(ctx, node1, meta.CreateOptions{})
 	k.client.CoreV1().Nodes().Create(ctx, node2, meta.CreateOptions{})
 
-	start, stop, err := k.InitAPIConn(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stop()
-	start()
+	k.setWatch(ctx)
+	go k.controller.Run(k.stopCh)
+	defer close(k.stopCh)
 
 	// quick and dirty wait for sync
 	for !k.controller.HasSynced() {
