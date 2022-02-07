@@ -21,7 +21,7 @@ import (
 	"github.com/coredns/coredns/request"
 )
 
-// KubeNodes implements a plugin that connects to a KubeNodes cluster.
+// KubeNodes is a plugin that creates records for a Kubernetes cluster's nodes.
 type KubeNodes struct {
 	Next     plugin.Handler
 	Zones    []string
