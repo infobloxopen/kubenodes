@@ -13,7 +13,6 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/dnsutil"
@@ -28,11 +27,6 @@ type KubeNodes struct {
 	Zones    []string
 	Upstream upstreamer
 
-	APIServer       string
-	APICertAuth     string
-	APIClientCert   string
-	APIClientKey    string
-	ClientConfig    clientcmd.ClientConfig
 	Fall            fall.F
 	ttl             uint32
 	ipType, dnsType core.NodeAddressType
