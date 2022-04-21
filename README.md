@@ -39,7 +39,7 @@ kubenodes [ZONES...] {
 ## External Plugin
 
 To use this plugin, compile CoreDNS with this plugin added to the `plugin.cfg`.  It should be positioned before
-the _kubernetes_ plugin if _kubenode_ is using the same zone or a superzone of _kubernetes_.  This plugin also requires
+the _kubernetes_ plugin if _kubenode_ is using the same zone or a subdomain of _kubernetes_'s zone.  This plugin also requires
 the _kubeapi_ plugin, which should be added to the end of `plugin.cfg`.
 
 ## Ready
